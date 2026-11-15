@@ -16,6 +16,8 @@ HOSTS = (
     "218.75.126.9",
     "115.238.56.198",
     "123.125.108.14",
+    "202.108.253.130",
+    "14.17.75.71",
 )
 PORT = 7709
 BAR_COUNT = 30
@@ -65,7 +67,8 @@ def probe(host, expected_date):
     except Exception as exc:
         result.update(ok=False, stage=stage, error=f"{type(exc).__name__}: {exc}")
     finally:
-        api.disconnect()
+        if api.client is not None:
+            api.client.close()
     result["latencyMs"] = round((time.monotonic() - started) * 1000)
     return result
 
