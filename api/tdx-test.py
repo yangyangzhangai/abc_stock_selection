@@ -65,7 +65,8 @@ def probe(host, expected_date):
             result.setdefault("bars", {})[code] = bars
         result["ok"] = True
     except Exception as exc:
-        result.update(ok=False, stage=stage, error=f"{type(exc).__name__}: {exc}")
+        cause = getattr(exc, "original_exception", None) or exc.__cause__ or exc.__context__ or exc
+        result.update(ok=False, stage=stage, error=f"{type(cause).__name__}: {cause}")
     finally:
         if api.client is not None:
             api.client.close()
