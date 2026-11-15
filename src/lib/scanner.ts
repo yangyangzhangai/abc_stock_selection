@@ -85,6 +85,7 @@ export async function scanMarket(asofRaw:string,manualText=""):Promise<ScanResul
       const evalDate=latest < marketDate ? latest : marketDate;
       const signal=evaluateStockT0(series,t0,evalDate);
       if(signal){
+        if(signal.phase==="ready" && latest < marketDate)continue;
         if(latest < marketDate)signal.notes.unshift(`数据滞后：应更新到${marketDate}，当前仅有${latest}；不可作为明日买入信号`);
         signals.push(signal);
       }

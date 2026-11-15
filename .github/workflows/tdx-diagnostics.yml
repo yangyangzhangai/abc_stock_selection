@@ -28,16 +28,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify deployed endpoint
         run: |
-          for attempt in 1 2 3 4; do
+          for attempt in 1 2 3 4 5 6; do
             if curl --fail-with-body --silent --show-error --max-time 25 \
                 --get --data-urlencode "date=$EXPECTED_DATE" \
                 "$VERCEL_URL/api/tdx-test" -o vercel-tdx.json &&
-                jq -e '.connectionSuccessRate != null and .servers != null' vercel-tdx.json >/dev/null; then
+                jq -e --arg sha "$GITHUB_SHA" '.vercelRegion == "hkg1" and .commitSha == $sha' vercel-tdx.json >/dev/null; then
               jq 'del(.bars)' vercel-tdx.json
               exit 0
             fi
             sleep 15
           done
+          jq 'del(.bars)' vercel-tdx.json || true
           exit 1
         continue-on-error: true
       - uses: actions/setup-python@v5

@@ -15,9 +15,9 @@ HOSTS = (
     "60.191.117.167",
     "218.75.126.9",
     "115.238.56.198",
-    "123.125.108.14",
-    "202.108.253.130",
-    "14.17.75.71",
+    "180.153.18.171",
+    "124.160.88.183",
+    "218.57.11.101",
 )
 PORT = 7709
 BAR_COUNT = 30
@@ -46,27 +46,33 @@ def validate_bars(rows):
     return bars
 
 
+def error_text(exc):
+    cause = getattr(exc, "original_exception", None) or exc.__cause__ or exc.__context__ or exc
+    return f"{type(cause).__name__}: {cause}"
+
+
 def probe(host, expected_date):
     started = time.monotonic()
     result = {"host": host, "port": PORT, "connected": False, "stocks": {}}
     api = TdxHq_API(heartbeat=False, auto_retry=False, raise_exception=True)
-    stage = "connect"
     try:
         if not api.connect(host, PORT, time_out=2):
             raise ConnectionError("TDX handshake failed")
         result["connected"] = True
         result["connectMs"] = round((time.monotonic() - started) * 1000)
         for market, code in STOCKS:
-            stage = code
-            bars = validate_bars(api.get_security_bars(9, market, code, 0, BAR_COUNT))
+            try:
+                bars = validate_bars(api.get_security_bars(9, market, code, 0, BAR_COUNT))
+            except Exception as exc:
+                result["stocks"][code] = {"ok": False, "error": error_text(exc)}
+                continue
             latest = bars[-1]["date"]
-            result["stocks"][code] = {"latestDate": latest, "barCount": len(bars),
+            result["stocks"][code] = {"ok": True, "latestDate": latest, "barCount": len(bars),
                                       "matchesExpectedDate": latest == expected_date if expected_date else None}
             result.setdefault("bars", {})[code] = bars
-        result["ok"] = True
+        result["ok"] = all(stock["ok"] for stock in result["stocks"].values())
     except Exception as exc:
-        cause = getattr(exc, "original_exception", None) or exc.__cause__ or exc.__context__ or exc
-        result.update(ok=False, stage=stage, error=f"{type(cause).__name__}: {cause}")
+        result.update(ok=False, stage="connect", error=error_text(exc))
     finally:
         if api.client is not None:
             api.client.close()
@@ -96,6 +102,7 @@ def diagnose(expected_date=None):
         "ok": bool(successful),
         "checkedAt": datetime.now(timezone.utc).isoformat(),
         "vercelRegion": os.getenv("VERCEL_REGION"),
+        "commitSha": os.getenv("VERCEL_GIT_COMMIT_SHA"),
         "expectedDate": expected_date,
         "priceBasis": "unadjusted",
         "connectionSuccessRate": connected / len(servers),
